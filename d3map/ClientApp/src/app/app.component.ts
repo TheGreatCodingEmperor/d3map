@@ -25,7 +25,7 @@ export class AppComponent implements OnInit {
 
         //#region <外框，中心點>
         let width = 900;
-        let height = 600;
+        let height = 900;
         let centered;
         //#endregion </外框，中心點>
 
@@ -230,17 +230,18 @@ export class AppComponent implements OnInit {
                     })
                     .attr("class", "country")
                     // add a mouseover action to show name label for feature/country
-                    .on("mouseover", function (d: any, i: any) {
-                        d3.select(this).style("fill", "orange");
-                        console.log(i);
-                        d3.select(`#countryLabel${i.properties.TOWNID}`).style("display", "block");
-                    })
-                    .on("mouseout", function (d: any, i: any) {
-                        d3.select(this).style("fill", "grey");
-                        d3.select(`#countryLabel${i.properties.TOWNID}`).style("display", "none");
-                    })
+                    // .on("mouseover", function (d: any, i: any) {
+                    //     d3.select(this).style("fill", "orange");
+                    //     console.log(i);
+                    //     d3.select(`#countryLabel${i.properties.TOWNID}`).style("display", "block");
+                    // })
+                    // .on("mouseout", function (d: any, i: any) {
+                    //     d3.select(this).style("fill", "grey");
+                    //     d3.select(`#countryLabel${i.properties.TOWNID}`).style("display", "none");
+                    // })
                     .on("mouseover", function (d, i) {
                         Tooltip.style("opacity", 1)
+                        d3.select(this).style("fill", "orange");
                     })
                     .on("mousemove", function (d, i: any) {
                         Tooltip
@@ -250,6 +251,7 @@ export class AppComponent implements OnInit {
                     })
                     .on("mouseleave", function (d, i) {
                         Tooltip.style("opacity", 0)
+                        d3.select(this).style("fill", "grey");
                     })
                     // add an onclick action to zoom into clicked country
                     .on("click", function (d, i) {
