@@ -1,14 +1,11 @@
-import { AfterContentChecked, AfterContentInit, Component, OnInit } from '@angular/core';
-import { select } from 'd3-selection';
-import { geomap } from 'd3-geomap';
-import { features } from 'process';
+import { Component, OnInit } from '@angular/core';
 import * as d3 from 'd3';
 import * as t from 'topojson';
+import * as d3GeoBar from 'd3-geo-scale-bar'
 // export * from 'd3-selection';
 export * from 'd3-drag';
 
-import mercatorTw from 'taiwan-atlas';
-import { IfStmt } from '@angular/compiler';
+import * as svgExport from 'save-svg-as-png';
 
 @Component({
     selector: 'app-root',
@@ -78,8 +75,16 @@ export class AppComponent implements OnInit {
             .scale(30000)//函式用於設定放大的比例。
             .translate([200, 500]);//函式用於設定平移。;
 
-        //svg 最外框
+        var scaleBarZoom = d3GeoBar.geoScaleBar()
+            .projection(projection)
+            .size([width, height])
+            .left(.05)
+            .top(.05)
+            .tickFormat(d => d3.format(",")(Math.round(d)));
+
+        //svg 最外框(陸地)
         let svg = d3.select('#map').append('svg')
+            .attr("id", "svgmap")
             .attr('width', width)
             .attr('height', height)
             .style("fill", "grey")
@@ -87,10 +92,27 @@ export class AppComponent implements OnInit {
         // .on("wheel.zoom", null);
 
         var rect = svg.append('rect')
-            .attr("x", "10")
-            .attr("y", "10")
+            // .attr("x", "-10")
+            // .attr("y", "-10")
             .attr("width", width)
             .attr("height", height).attr("fill", "white").on("click", function () { clicked(null); });
+
+        const bar = svg.append("g")
+            .attr("class", "scale-bar-wrapper")
+            .call(scaleBarZoom);
+
+        var Tooltip = d3.select("body")
+            .append("div")
+            .attr("class", "tooltip")
+            .style("opacity", 1)
+            .style("background-color", "white")
+            .style("border", "solid")
+            .style("border-width", "2px")
+            .style("border-radius", "5px")
+            .style("padding", "5px")
+            .style("position", "absolute")
+
+        //svg 外層(background)
 
         // nation 框path
         let path = d3.geoPath()
@@ -98,7 +120,7 @@ export class AppComponent implements OnInit {
 
         // country/town 框path
         let countriesGroup = svg.append('g');
-        countriesGroup.attr('class', 'map');
+        countriesGroup.attr('class', 'map')
 
         //醫院point
         var bubbles = svg
@@ -117,11 +139,13 @@ export class AppComponent implements OnInit {
             .on("mouseenter", (d: any, i: any) => {
                 this.hospital = i;
             })
-            .on("click", function (d, i) {
-                window.location.href = i.url;
-            });
+            // .on("click", function (d, i) {
+            //     window.location.href = i.url;
+            // });
 
+        // 行政區paths
         var countries;
+        // 里paths
         var villages;
 
         //點擊 country/town zoom
@@ -147,6 +171,9 @@ export class AppComponent implements OnInit {
             // countriesGroup.selectAll("myCircles")
             //     .classed("active", centered && function (d) { return d === centered; });
 
+            scaleBarZoom.zoomFactor(k);
+            bar.call(scaleBarZoom);
+
             countriesGroup.transition()
                 .duration(750)
                 .attr("transform", "translate(" + width / 2 + "," + height / 2 + ")scale(" + k + ")translate(" + -x + "," + -y + ")")
@@ -169,9 +196,8 @@ export class AppComponent implements OnInit {
                 this.townId = d.properties.TOWNID;
                 svg.select(`#country${d.properties.TOWNID}`)
                     .attr("stroke", "white")
-                    // .attr("stroke-width", "3px")
-                    .append("filter")
-                    .attr("id", "dropshadow");
+                // .attr("stroke-width", "3px")
+
             }
 
             console.log(`#country${d.properties.TOWNID}`);
@@ -229,23 +255,13 @@ export class AppComponent implements OnInit {
                             return `country${d.properties.TOWNID}`;
                     })
                     .attr("class", "country")
-                    // add a mouseover action to show name label for feature/country
-                    // .on("mouseover", function (d: any, i: any) {
-                    //     d3.select(this).style("fill", "orange");
-                    //     console.log(i);
-                    //     d3.select(`#countryLabel${i.properties.TOWNID}`).style("display", "block");
-                    // })
-                    // .on("mouseout", function (d: any, i: any) {
-                    //     d3.select(this).style("fill", "grey");
-                    //     d3.select(`#countryLabel${i.properties.TOWNID}`).style("display", "none");
-                    // })
                     .on("mouseover", function (d, i) {
                         Tooltip.style("opacity", 1)
                         d3.select(this).style("fill", "orange");
                     })
                     .on("mousemove", function (d, i: any) {
                         Tooltip
-                            .html(i.properties.TOWNNAME)
+                            .html(i.properties.COUNTYNAME + i.properties.TOWNNAME)
                             .style("left", (d.clientX + 10) + "px")
                             .style("top", (d.clientY) + "px")
                     })
@@ -260,17 +276,6 @@ export class AppComponent implements OnInit {
                         clicked(i);
                     });
 
-                var Tooltip = d3.select("body")
-                    .append("div")
-                    .attr("class", "tooltip")
-                    .style("opacity", 1)
-                    .style("background-color", "white")
-                    .style("border", "solid")
-                    .style("border-width", "2px")
-                    .style("border-radius", "5px")
-                    .style("padding", "5px")
-                    .style("position","absolute")
-
                 // villages = countriesGroup
                 //     .selectAll("path")
                 //     .data(t.feature(topology, (topology as any).objects.villages).features)
@@ -279,28 +284,28 @@ export class AppComponent implements OnInit {
                 //     .attr("d", path)
                 //     .attr("id", function (d: any, i) {
                 //         if (d.properties)
-                //             return `vill${d.properties.VILLCODE}`;
+                //             return `vill${d.properties.VILLCODE} countryLabel${d.properties.TOWNID}`;
                 //     })
                 //     .attr("class", "vill")
-                //     .attr("class", function (d: any, i) {
-                //         if (d.properties)
-                //             return `countryLabel${d.properties.TOWNID}`;
-                //     })
-                //     .attr('opacity', 0)
+                //     .attr('display', 'none')
                 //     // add a mouseover action to show name label for feature/country
-                //     .on("mouseover", function (d: any, i: any) {
+                //     .on("mouseover", function (d, i) {
+                //         Tooltip.style("opacity", 1)
                 //         d3.select(this).style("fill", "orange");
-                //         console.log(i);
-                //         d3.select(`#countryLabel${i.properties.TOWNID}`).style("display", "block");
                 //     })
-                //     .on("mouseout", function (d: any, i: any) {
+                //     .on("mousemove", function (d, i: any) {
+                //         Tooltip
+                //             .html(i.properties.COUNTYNAME+i.properties.TOWNNAME+i.properties.VILLNAME)
+                //             .style("left", (d.clientX + 10) + "px")
+                //             .style("top", (d.clientY) + "px")
+                //     })
+                //     .on("mouseleave", function (d, i) {
+                //         Tooltip.style("opacity", 0)
                 //         d3.select(this).style("fill", "grey");
-                //         d3.select(`#countryLabel${i.properties.TOWNID}`).style("display", "none");
                 //     })
                 //     // add an onclick action to zoom into clicked country
                 //     .on("click", function (d, i) {
-                //         d3.selectAll(".country").classed("country-on", false);
-                //         d3.select(this).classed("country-on", true);
+                //         d3.select(this).style("opacity", 1)
                 //         clicked(i);
                 //     });
 
@@ -363,5 +368,30 @@ export class AppComponent implements OnInit {
             });
 
         console.log("outside json calling1");
+    }
+
+    exportPicture() {
+        var filename = "export.png";
+        svgExport.saveSvgAsPng(document.querySelector('svg'), "export.png")
+    }
+    convertBase64ToBlobData(base64Data: string, contentType: string = 'image/png', sliceSize = 512) {
+        const byteCharacters = btoa(base64Data);
+        const byteArrays = [];
+
+        for (let offset = 0; offset < byteCharacters.length; offset += sliceSize) {
+            const slice = byteCharacters.slice(offset, offset + sliceSize);
+
+            const byteNumbers = new Array(slice.length);
+            for (let i = 0; i < slice.length; i++) {
+                byteNumbers[i] = slice.charCodeAt(i);
+            }
+
+            const byteArray = new Uint8Array(byteNumbers);
+
+            byteArrays.push(byteArray);
+        }
+
+        const blob = new Blob(byteArrays, { type: contentType });
+        return blob;
     }
 }
